@@ -5,22 +5,67 @@
 #include<gl\GL.h>
 using namespace std;
 
-GLfloat tj(GLfloat ti, GLfloat pi,GLfloat pj,GLfloat alpha) {
+//struct for point in two dimensional space
+typedef struct Point {
+	GLfloat x;
+	GLfloat y;
+	Point() {}
+	Point(GLfloat x, GLfloat y) {
+		this->x = x;
+		this->y = y;
+	}
+	Point& operator /(Point& x) {
+		Point p = Point(this->x / x.x, this->y/y);
+		return p;
+	}
+	Point& operator *(Point& x) {
+		this->x *= x.x;
+		this->y *= x.y;
+		return *this;
+	}
+	Point& operator +(Point& x) {
+		this->x += x.x;
+		this->y += x.y;
+		return *this;
+	}
+	Point& operator *(GLfloat x) {
+		Point p = Point(this->x * x, this->y * y);
+		return p;
+	}
+}Point;
+
+float GetT(GLfloat ti, Point pi,Point pj,GLfloat alpha) {
 	GLfloat xi, yi;
 	GLfloat xj, yj;
-	xi = yi = pi;
-	xj = yj = pj;
-	return (GLfloat)pow(sqrt(pow(xj-xi,2)+ pow(yj - yi, 2)),alpha)+ti;
+	xi = pi.x;
+	yi = pi.y;
+	xj = pj.x;
+	yj = pj.y;
+	return ti+pow(sqrt(pow(xj-xi,2)+ pow(yj - yi, 2)),alpha);
 }
 
-int* CatmullRomSpline(GLfloat p0, GLfloat p1, GLfloat p2, GLfloat p3,int precision=100) {
+Point* CatmullRomSpline(Point p0, Point p1, Point p2, Point p3,int precision=100) {
+	Point* InterpolatedValue = new Point[precision];
+	int index = 0;
 	float alpha = 0.5;
 	GLfloat t0, t1, t2, t3;
-	t0 = 0;
-	t1 = tj(t0,p0,p1,alpha);
-	t2 = tj(t1, p1, p2, alpha);
-	t3 = tj(t2, p2, p3, alpha);
-	
+	t0 = 0.0f;
+	t1 = GetT(t0,p0,p1,alpha);
+	t2 = GetT(t1, p1, p2, alpha);
+	t3 = GetT(t2, p2, p3, alpha);
+	for (GLfloat t = t1; t < t2; t += (t2 - t1) / precision) {
+		Point A1 = p0*((t1 - t) / t1 - t0) + p1*((t - t0) / (t1 - t0));
+		Point A2 = p1*((t2 - t) / (t2 - t1)) + p2*((t - t1) / (t2 - t1));
+		Point A3 = p2*((t3 - t) / (t3 - t2)) + p2*((t - t2) / (t3 - t2));
+
+		Point B1 = A1*((t2 - t) / (t2 - t0)) + A2*((t - t0) / (t2 - t0));
+		Point B2 = A2*((t3 - t) / (t3 - t1)) + A3*((t - t1) / (t3 - t1));
+
+		Point C = B1*((t2 - t) / (t2 - t1)) + B2*((t - t1) / (t2 - t1));
+
+		InterpolatedValue[index++] = C;
+	}
+	return InterpolatedValue;
 }
 
 
