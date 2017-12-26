@@ -2,12 +2,20 @@
 #include<cmath>
 #include<gl\glut.h>
 #include<gl\GLU.h>
+#include<vector>
+#include<iterator>
 #include<gl\GL.h>
-#define BUFFER_SIZE 10
+#define BUFFER_SIZE 100
 using namespace std;
 
+enum DRAW_MODE
+{
+	LINE,POINT
+};
+
+DRAW_MODE dm= LINE;
 float alpha = 0.0;
-float deltaAlpha = 0.001f;
+float deltaAlpha = 0.01f;
 float sign = 1;
 //struct for point in two dimensional space
 typedef struct Point {
@@ -19,23 +27,25 @@ typedef struct Point {
 		this->y = y;
 	}
 	
-	Point& operator +(Point& x) {
-		Point* p = new Point(this->x + x.x, this->y + x.y);
-		return *p;
+	Point operator +(Point& x) {
+		Point p =Point(this->x + x.x, this->y + x.y);
+		return p;
 	}
-	Point& operator *(GLfloat x) {
-		Point* p =new Point(this->x * x, this->y * x);
-		return *p;
+	Point operator *(GLfloat x) {
+		Point p = Point(this->x * x, this->y * x);
+		return p;
 	}
 }Point;
 
-Point* buffer= new Point[BUFFER_SIZE];
+//Point* buffer= new Point[BUFFER_SIZE];
+vector<Point>points = vector<Point>();
+vector<Point> buffer = vector<Point>();
 
 GLfloat GetT(GLfloat ti, Point pi,Point pj,GLfloat alpha) {
 	return ti+pow(pow(pow((pj.x-pi.x),2)+ pow((pj.y - pi.y), 2),0.5f),alpha);
 }
 
-void CatmullRomSpline(Point p0, Point p1, Point p2, Point p3, Point* buffer,int precision=100,float alpha = 0.5f) {
+void CatmullRomSpline(Point p0, Point p1, Point p2, Point p3, int precision=100,float alpha = 0.5f) {
 	int index = 0;
 	GLfloat t0, t1, t2, t3;
 	t0 = 0.0f;
@@ -53,7 +63,7 @@ void CatmullRomSpline(Point p0, Point p1, Point p2, Point p3, Point* buffer,int 
 
 		Point C = (B1*((t2 - t) / (t2 - t1))) + (B2*((t - t1) / (t2 - t1)));
 
-		buffer[index++] = C;
+		buffer.push_back(C);
 	}
 
 }
@@ -66,54 +76,59 @@ void render() {
 	glLoadIdentity();
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-	glViewport(0, 0, 500, 500);
-	glOrtho(0, 500, 0, 500, -100, 100.0);
+	glViewport(0, 0, 1000, 1000);
+	glOrtho(0, 1000, 0, 1000, -100, 100.0);
+	buffer.clear();
 	
-	Point p0 = Point(10, 10);
-	Point p1 = Point(100, 250);
-	Point p2 = Point(250, 100);
-	Point p3 = Point(490, 490);
-
-	//Point temp = p0/2;
-	//printf("%f %f \n", temp.x, temp.y);
-
-	buffer = new Point[BUFFER_SIZE];
-	CatmullRomSpline(p0, p1, p2, p3, buffer, BUFFER_SIZE,alpha);
+	
+	
 	glPointSize(10);
+	
+
+
+	for (vector<Point>::iterator iter = points.begin(); next(iter, 3) != points.end(); iter++) {
+		CatmullRomSpline(*iter, *next(iter), *next(iter,2), *next(iter, 3), BUFFER_SIZE, alpha);
+	}
+
 	glColor3f(1, 0, 0);
-	glBegin(GL_POINTS); {
-		glVertex3f(p0.x, p0.y,0);
-		glVertex3f(p1.x, p1.y,0);
-		glVertex3f(p2.x, p2.y,0);
-		glVertex3f(p3.x, p3.y,0);
+	glBegin(GL_POINTS); 
+	{
+		for (vector<Point>::iterator iter = points.begin(); iter != points.end(); iter++) {
+			glVertex3f(iter->x, iter->y,0);
+		}
 	}
 	glEnd();
-
-	/*glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();*/
 		
 
 	glColor3f(1, 1, 1);
-
 	glPointSize(5);
 	
-
-	for (int i = 0; i < BUFFER_SIZE; i++) {
-		//printf("%f %f \n",buffer[i].x,buffer[i].y);
-		glPushMatrix(); {
-			glTranslatef(buffer[i].x, buffer[i].y,0);
-			//glutSolidSphere(5, 5, 5);
-			glBegin(GL_POINTS); {
-				glVertex3f(0,0,0);
+	switch(dm){
+	case LINE:
+		glLineWidth(2);
+		glBegin(GL_LINE_STRIP); {
+			for (vector<Point>::iterator it = buffer.begin(); it != buffer.end(); it++) {
+				glVertex3f((*it).x, (*it).y, 0);
 			}
-			glEnd();
 		}
-		glPopMatrix();
+		glEnd();
+		break;
+	case POINT:
+		for (vector<Point>::iterator it = buffer.begin(); it!= buffer.end(); it++) {
+			//printf("%f %f \n",buffer[i].x,buffer[i].y);
+			glPushMatrix(); {
+				glTranslatef((*it).x, (*it).y,0);
+		
+				glBegin(GL_POINTS); {
+					glVertex3f(0,0,0);
+				}
+				glEnd();
+			}
+			glPopMatrix();
+		}
+		break;
 	}
 	
-	//delete buffer;
 	glutSwapBuffers();
 	//boundary checker
 	if (alpha < 0 || alpha>1) {
@@ -124,15 +139,51 @@ void render() {
 	glutPostRedisplay();
 }
 
+void MouseFunc(int button, int state, int x, int y) {
+	if (button == 0 && state == 1) {
+		Point p = Point(x,1000-y);
+		points.push_back(p);
+	}
+	
+}
+
 int main(int argc,char** argv) {
 	
 	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
+	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA|GLUT_ALPHA|GLUT_DEPTH);
 	glutInitWindowPosition(0, 0);
-	glutInitWindowSize(500, 500);
+	glutInitWindowSize(1000, 1000);
+
+	glEnable(GLUT_MULTISAMPLE);
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_ALPHA_TEST);
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	glShadeModel(GL_PHONG_WIN);
+	glHint(GL_PHONG_HINT_WIN, GL_NICEST);
+
+	glEnable(GL_LINE_SMOOTH);
+	glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
+	
 
 	glutCreateWindow("it is a demonstration of Catmull-Rom Spline");
 	glClearColor(0.0, 0.0, 0.0, 0);
+
+	Point p0 = Point(10, 10);
+	Point p1 = Point(100, 250);
+	Point p2 = Point(250, 100);
+	Point p3 = Point(490, 490);
+
+	points.clear();
+
+	points.push_back(p0);
+	points.push_back(p1);
+	points.push_back(p2);
+	points.push_back(p3);
+
 	glutDisplayFunc(render);
+	glutMouseFunc(MouseFunc);
 	glutMainLoop();
 }
